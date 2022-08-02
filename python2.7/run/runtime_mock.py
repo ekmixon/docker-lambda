@@ -57,8 +57,11 @@ CREDENTIALS = {
     'secret': SECRET_ACCESS_KEY,
     'session': SESSION_TOKEN
 }
-INVOKED_FUNCTION_ARN = os.environ.get('AWS_LAMBDA_FUNCTION_INVOKED_ARN', \
-        'arn:aws:lambda:%s:%s:function:%s' % (REGION, ACCOUNT_ID, FUNCTION_NAME))
+INVOKED_FUNCTION_ARN = os.environ.get(
+    'AWS_LAMBDA_FUNCTION_INVOKED_ARN',
+    f'arn:aws:lambda:{REGION}:{ACCOUNT_ID}:function:{FUNCTION_NAME}',
+)
+
 XRAY_TRACE_ID = os.environ.get('_X_AMZN_TRACE_ID', None)
 XRAY_PARENT_ID = None
 XRAY_SAMPLED = None
@@ -70,14 +73,11 @@ INIT_END = time.time()
 RECEIVED_INVOKE_AT = time.time()
 TODAY = datetime.date.today()
 # export needed stuff
-os.environ['AWS_LAMBDA_LOG_GROUP_NAME'] = '/aws/lambda/%s' % FUNCTION_NAME
-os.environ['AWS_LAMBDA_LOG_STREAM_NAME'] = "%s/%s/%s/[%s]%s" % (
-    TODAY.year,
-    TODAY.month,
-    TODAY.day,
-    FUNCTION_VERSION,
-    '%016x' % random.randrange(16**16)
-)
+os.environ['AWS_LAMBDA_LOG_GROUP_NAME'] = f'/aws/lambda/{FUNCTION_NAME}'
+os.environ[
+    'AWS_LAMBDA_LOG_STREAM_NAME'
+] = f"{TODAY.year}/{TODAY.month}/{TODAY.day}/[{FUNCTION_VERSION}]{'%016x' % random.randrange(16**16)}"
+
 os.environ["AWS_LAMBDA_FUNCTION_NAME"] = FUNCTION_NAME
 os.environ['AWS_LAMBDA_FUNCTION_MEMORY_SIZE'] = MEM_SIZE
 os.environ['AWS_LAMBDA_FUNCTION_VERSION'] = FUNCTION_VERSION
@@ -143,9 +143,8 @@ def receive_start():
         except Exception:
             if time.time() > ping_timeout:
                 raise
-            else:
-                time.sleep(.005)
-                continue
+            time.sleep(.005)
+            continue
     return (
         INVOKEID,
         INVOKE_MODE,
@@ -223,9 +222,9 @@ def report_fault(invokeid, msg, except_value, trace):
     ERRORED = True
 
     if msg and except_value:
-        eprint('%s: %s' % (msg, except_value))
+        eprint(f'{msg}: {except_value}')
     if trace:
-        eprint('%s' % trace)
+        eprint(f'{trace}')
 
 
 def report_done(invokeid, errortype, result, is_fatal):
@@ -251,8 +250,13 @@ def report_done(invokeid, errortype, result, is_fatal):
         headers['Docker-Lambda-Init-End'] = int(INIT_END * 1000)
         INIT_END_SENT = True
 
-    MOCKSERVER_CONN.request("POST", "/2018-06-01/runtime/invocation/%s/%s" % \
-            (invokeid, "response" if errortype is None else "error"), result, headers)
+    MOCKSERVER_CONN.request(
+        "POST",
+        f'/2018-06-01/runtime/invocation/{invokeid}/{"response" if errortype is None else "error"}',
+        result,
+        headers,
+    )
+
     resp = MOCKSERVER_CONN.getresponse()
     if resp.status != 202:
         raise Exception("/invocation/response return status %d" % resp.status)
